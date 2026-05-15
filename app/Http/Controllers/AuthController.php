@@ -23,54 +23,55 @@ class AuthController extends Controller
         $request->validate([
             'name' => 'required',
             'username' => 'required|unique:users,username',
-            'password' => 'required|min:6'
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:6',
+            'confirm_password' => 'required|same:password'
         ]);
 
         User::create([
             'name' => $request->name,
             'username' => $request->username,
-            'password' => Hash::make($request->password)
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'role' => 'user'
         ]);
 
-        return redirect('/login')
-            ->with('success', 'Đăng ký tài khoản thành công');
+        return redirect('/login')->with('success', 'Đăng ký thành công, vui lòng đăng nhập');
     }
 
     public function login(Request $request)
     {
-        $username = $request->username;
-        $password = $request->password;
+        $request->validate([
+            'username' => 'required',
+            'password' => 'required'
+        ]);
 
-        $user = User::where('username', $username)->first();
+        $user = User::where('username', $request->username)->first();
 
-        if ($user && Hash::check($password, $user->password)) {
+        if ($user && Hash::check($request->password, $user->password)) {
             session([
                 'isLogin' => true,
-                'username' => $user->username,
+                'user_id' => $user->id,
                 'name' => $user->name,
-                'user_id' => $user->id
+                'username' => $user->username,
+                'email' => $user->email,
+                'role' => $user->role,
+                'login_time' => now()->format('d/m/Y H:i:s')
             ]);
+
+            if ($user->role == 'admin') {
+                return redirect('/admin/dashboard');
+            }
 
             return redirect('/dashboard');
         }
 
-        return redirect('/login')
-            ->with('error', 'Sai tên đăng nhập hoặc mật khẩu');
-    }
-
-    public function dashboard()
-    {
-        if (!session('isLogin')) {
-            return redirect('/login');
-        }
-
-        return view('dashboard');
+        return back()->with('error', 'Sai tài khoản hoặc mật khẩu');
     }
 
     public function logout()
     {
         session()->flush();
-
-        return redirect('/login');
+        return redirect('/login')->with('success', 'Đăng xuất thành công');
     }
 }
